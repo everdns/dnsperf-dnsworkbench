@@ -1642,7 +1642,7 @@ int main(int argc, char** argv)
     perf_result_t          result;
     struct perf_net_socket sock = { .mode = sock_pipe };
 
-    printf("DNS Performance Testing Tool\n"
+    printf("DNS Performance Testing Tool dnpserf-dnsworkbench\n"
            "Version " PACKAGE_VERSION "\n\n");
 
     (void)SSL_library_init();
