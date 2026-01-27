@@ -55,5 +55,6 @@ void perf_opt_parse(int argc, char** argv);
 
 perf_suppress_t perf_opt_parse_suppress(const char* val);
 rate_limit_algo_t perf_opt_parse_rate_algo(const char* val);
+const char *rate_limit_algo_to_str(rate_limit_algo_t algo);
 
 #endif

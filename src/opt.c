@@ -409,6 +409,18 @@ rate_limit_algo_t perf_opt_parse_rate_algo(const char* val) {
     return ret;
 }
 
+const char *rate_limit_algo_to_str(rate_limit_algo_t algo)
+{
+    switch (algo) {
+    case RATE_LIMIT_SLICE:
+        return "slice";
+    case RATE_LIMIT_LEAKY_BUCKET:
+        return "leaky-bucket";
+    default:
+        return "unknown";
+    }
+}
+
 perf_suppress_t perf_opt_parse_suppress(const char* val)
 {
     perf_suppress_t s = { false, false, false, false };
