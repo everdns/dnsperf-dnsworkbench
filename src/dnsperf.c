@@ -804,6 +804,7 @@ setup(int argc, char** argv, config_t* config)
         }
     }
     printf("Using qps_threshold: %d\n", config->qps_threshold_wait);
+    printf("Using rate limiter: %s\n", config->rate_limit_algo)
 }
 
 static void
