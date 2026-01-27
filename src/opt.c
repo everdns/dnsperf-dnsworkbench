@@ -389,6 +389,26 @@ void perf_opt_parse(int argc, char** argv)
     }
 }
 
+rate_limit_algo_t perf_opt_parse_rate_algo(const char* val) {
+    rate_limit_algo_t ret;
+    if (val == NULL) {
+        ret = RATE_LIMIT_SLICE;  // or handle error if you prefer
+    } else if (strcmp(val, "slice") == 0) {
+        ret = RATE_LIMIT_SLICE;
+    } else if (strcmp(val, "leaky-bucket") == 0 ||
+        strcmp(val, "leaky_bucket") == 0 ||
+        strcmp(val, "leakybucket") == 0) {
+        ret = RATE_LIMIT_LEAKY_BUCKET;
+    } else {
+        fprintf(stderr,
+            "Invalid rate limiter algorithm '%s'. Valid options: slice, leaky-bucket\n",
+            val);
+        perf_opt_usage();
+        exit(1);
+    }
+    return ret;
+}
+
 perf_suppress_t perf_opt_parse_suppress(const char* val)
 {
     perf_suppress_t s = { false, false, false, false };

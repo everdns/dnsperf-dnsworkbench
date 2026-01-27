@@ -40,6 +40,11 @@ typedef struct {
     bool unexpected;
 } perf_suppress_t;
 
+typedef enum {
+    RATE_LIMIT_SLICE,
+    RATE_LIMIT_LEAKY_BUCKET
+} rate_limit_algo_t;
+
 void perf_opt_add(char c, perf_opttype_t type, const char* desc, const char* help, const char* defval, void* valp);
 void perf_long_opt_add(const char* name, perf_opttype_t type, const char* desc, const char* help, const char* defval, void* valp);
 
@@ -49,5 +54,6 @@ void perf_long_opt_usage(void);
 void perf_opt_parse(int argc, char** argv);
 
 perf_suppress_t perf_opt_parse_suppress(const char* val);
+rate_limit_algo_t perf_opt_parse_rate_algo(const char* val);
 
 #endif

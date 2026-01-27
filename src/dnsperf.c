@@ -98,6 +98,7 @@ typedef struct {
     bool                verbose;
     enum perf_net_mode  mode;
     perf_suppress_t     suppress;
+    rate_limit_algo_t rate_limit_algo;
     size_t              num_queries_per_conn;
 #ifdef USE_HISTOGRAMS
     bool latency_histogram;
@@ -594,6 +595,7 @@ setup(int argc, char** argv, config_t* config)
     const char* doh_uri        = DEFAULT_DOH_URI;
     const char* doh_method     = DEFAULT_DOH_METHOD;
     const char* local_suppress = 0;
+    const char* local_rate_limiter = 0;
     const char* tls_sni        = 0;
 
     memset(config, 0, sizeof(*config));
@@ -691,6 +693,7 @@ setup(int argc, char** argv, config_t* config)
         "minimum threshold for enabling wait in rate limiting", stringify(config->qps_threshold_wait), &config->qps_threshold_wait);
     perf_long_opt_add("tls-sni", perf_opt_string, "tls_sni",
         "the TLS SNI to use for TLS connections", NULL, &tls_sni);
+    perf_long_opt_add("rate-limiter", perf_opt_string, "algo", "Rate Limiter Algorithm", "slice", &local_rate_limiter);
 
     bool log_stdout = false;
     perf_opt_add('W', perf_opt_boolean, NULL, "log warnings and errors to stdout instead of stderr", NULL, &log_stdout);
@@ -702,6 +705,7 @@ setup(int argc, char** argv, config_t* config)
     }
 
     config->suppress = perf_opt_parse_suppress(local_suppress);
+    config->rate_limit_algo = perf_opt_parse_rate_algo(local_rate_limiter);
 
     if (mode != 0)
         config->mode = perf_net_parsemode(mode);
@@ -799,6 +803,7 @@ setup(int argc, char** argv, config_t* config)
             perf_log_fatal("Unable to measure nanosleep(): %s", perf_strerror_r(errno, __s, sizeof(__s)));
         }
     }
+    printf("Using qps_threshold: %d\n", config->qps_threshold_wait);
 }
 
 static void
@@ -905,6 +910,7 @@ do_send(void* arg)
     unsigned int    max_packet_size;
     perf_buffer_t   msg;
     uint64_t        now, req_time, wait_us, q_sent = 0, q_step = 0, q_slice;
+    double          bucket_level = 0.0, capacity = 1.0, excess = 0.0, leaked = 0.0;
     char            input_data[MAX_INPUT_DATA];
     perf_buffer_t   lines;
     perf_region_t   used;
@@ -964,7 +970,6 @@ do_send(void* arg)
 
         /* Rate limiting */
         if (tinfo->max_qps > 0) {
-            //MAYBE lookinto leaky bucket implementation
             /* the 1 second time slice where q_sent is calculated over */
             //if (q_slice <= now) {
             //    q_slice += MILLION;
@@ -992,9 +997,38 @@ do_send(void* arg)
             //    continue;
             //}
             /* handle stepping to the next window to send a query on */
-            if (req_time > now) {
-                if (!any_inprogress) { // only if nothing is in-progress
-                    wait_us = req_time - now;
+            if (config->rate_limit_algo == RATE_LIMIT_SLICE) {
+                if (req_time > now) {
+                    if (!any_inprogress) { // only if nothing is in-progress
+                        wait_us = req_time - now;
+                        if (config->qps_threshold_wait && wait_us > config->qps_threshold_wait) {
+                            wait_us -= config->qps_threshold_wait;
+                            struct timespec ts = { 0, 0 };
+                            if (wait_us >= MILLION) {
+                                ts.tv_sec  = wait_us / MILLION;
+                                ts.tv_nsec = (wait_us % MILLION) * 1000;
+                            } else {
+                                ts.tv_sec  = 0;
+                                ts.tv_nsec = wait_us * 1000;
+                            }
+                            nanosleep(&ts, NULL);
+                        }
+                    }
+                    now = perf_get_time();
+                    continue;
+                }
+                req_time += q_step;
+            } else { //config is leaky bucket
+                leaked = (double) (now - req_time) * (double) tinfo->max_qps / MILLION;
+                if (bucket_level > leaked) {
+                    bucket_level -= leaked;
+                } else {
+                    bucket_level = 0.0;
+                }
+                req_time = now;
+                if (bucket_level > capacity) {
+                    excess = bucket_level - capacity;
+                    wait_us = (uint64_t) (excess * q_step);
                     if (config->qps_threshold_wait && wait_us > config->qps_threshold_wait) {
                         wait_us -= config->qps_threshold_wait;
                         struct timespec ts = { 0, 0 };
@@ -1007,11 +1041,11 @@ do_send(void* arg)
                         }
                         nanosleep(&ts, NULL);
                     }
+                    now = perf_get_time();
+                    continue;
                 }
-                now = perf_get_time();
-                continue;
+                bucket_level += 1.0;
             }
-            req_time += q_step;
         }
 
         PERF_LOCK(&tinfo->lock);
@@ -1652,6 +1686,7 @@ int main(int argc, char** argv)
 #endif
 
     setup(argc, argv, &config);
+    
 
     if (pipe(threadpipe) < 0 || pipe(mainpipe) < 0 || pipe(intrpipe) < 0)
         perf_log_fatal("creating pipe");
