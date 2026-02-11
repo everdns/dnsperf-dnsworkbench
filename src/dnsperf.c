@@ -911,7 +911,7 @@ do_send(void* arg)
     unsigned int    max_packet_size;
     perf_buffer_t   msg;
     uint64_t        now, req_time, wait_us, q_sent = 0, q_step = 0, q_slice;
-    double          bucket_level = 0.0, capacity = 1.0, excess = 0.0, leaked = 0.0;
+    double          bucket_level = 0.0, capacity = 1.0, excess = 0.0, leaked = 0.0, q_step_double, req_time_double, now_double;
     char            input_data[MAX_INPUT_DATA];
     perf_buffer_t   lines;
     perf_region_t   used;
@@ -939,10 +939,12 @@ do_send(void* arg)
 
     if (tinfo->max_qps > 0) {
         q_step = MILLION / tinfo->max_qps;
+        q_step_double = ((double) MILLION) / ((double) tinfo->max_qps);
     }
     wait_for_start();
     now      = perf_get_time();
     req_time = now;
+    req_time_double = (double) now;
     q_slice  = now + MILLION;
     while (!interrupted && now < times->stop_time) {
         /* Avoid flooding the network too quickly. */
@@ -972,7 +974,8 @@ do_send(void* arg)
         /* Rate limiting */
         if (tinfo->max_qps > 0) {
             if (config->rate_limit_algo == RATE_LIMIT_SLICE) {
-                if (req_time > now) {
+                now_double = (double) now;
+                if (req_time_double > now_double) {
                     if (!any_inprogress) { // only if nothing is in-progress
                         wait_us = req_time - now;
                         if (config->qps_threshold_wait && wait_us > config->qps_threshold_wait) {
@@ -992,6 +995,7 @@ do_send(void* arg)
                     continue;
                 }
                 req_time += q_step;
+                req_time_double += q_step_double;
             } else { //config is leaky bucket
                 leaked = (double) (now - req_time) * (double) tinfo->max_qps / MILLION;
                 if (bucket_level > leaked) {
@@ -1000,7 +1004,7 @@ do_send(void* arg)
                     bucket_level = 0.0;
                 }
                 req_time = now;
-                if (bucket_level > capacity) {
+                if (bucket_level >= capacity) {
                     excess = bucket_level - capacity;
                     wait_us = (uint64_t) (excess * q_step);
                     if (config->qps_threshold_wait && wait_us > config->qps_threshold_wait) {
