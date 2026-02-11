@@ -203,7 +203,7 @@ static int intrpipe[2];
 
 static perf_datafile_t* input;
 
-const char* progname = "dnsperf";
+const char* progname = "dnsperf-workbench";
 
 static void
 handle_sigint(int sig)
@@ -971,33 +971,6 @@ do_send(void* arg)
 
         /* Rate limiting */
         if (tinfo->max_qps > 0) {
-            /* the 1 second time slice where q_sent is calculated over */
-            //if (q_slice <= now) {
-            //    q_slice += MILLION;
-            //    q_sent   = 0;
-            //    req_time = now; // reset stepping, in case of clock sliding
-            //}
-            ///* limit QPS over the 1 second slice */
-            //if (q_sent >= tinfo->max_qps) {
-            //    if (!any_inprogress) { // only if nothing is in-progress
-            //        wait_us = q_slice - now;
-            //        if (config->qps_threshold_wait && wait_us > config->qps_threshold_wait) {
-            //            wait_us -= config->qps_threshold_wait;
-            //            struct timespec ts = { 0, 0 };
-            //            if (wait_us >= MILLION) {
-            //                ts.tv_sec  = wait_us / MILLION;
-            //                ts.tv_nsec = (wait_us % MILLION) * 1000;
-            //            } else {
-            //                ts.tv_sec  = 0;
-            //                ts.tv_nsec = wait_us * 1000;
-            //            }
-            //            nanosleep(&ts, NULL);
-            //        }
-            //    }
-            //    now = perf_get_time();
-            //    continue;
-            //}
-            /* handle stepping to the next window to send a query on */
             if (config->rate_limit_algo == RATE_LIMIT_SLICE) {
                 if (req_time > now) {
                     if (!any_inprogress) { // only if nothing is in-progress
