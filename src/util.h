@@ -155,6 +155,13 @@ static __inline__ uint64_t perf_get_time(void)
     return tv.tv_sec * MILLION + tv.tv_usec;
 }
 
+static __inline__ uint64_t perf_get_time_ns(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ((uint64_t)ts.tv_sec * 1000000000ULL) + ts.tv_nsec;
+}
+
 #define PERF_SAFE_DIV(n, d) ((d) == 0 ? 0 : (n) / (d))
 
 #endif
