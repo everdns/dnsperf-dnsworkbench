@@ -399,6 +399,8 @@ rate_limit_algo_t perf_opt_parse_rate_algo(const char* val) {
         strcmp(val, "leaky_bucket") == 0 ||
         strcmp(val, "leakybucket") == 0) {
         ret = RATE_LIMIT_LEAKY_BUCKET;
+    } else if (strcmp(val, "lencse") == 0) {
+        ret = RATE_LIMIT_LENCSE;
     } else {
         fprintf(stderr,
             "Invalid rate limiter algorithm '%s'. Valid options: slice, leaky-bucket\n",

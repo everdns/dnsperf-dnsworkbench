@@ -41,6 +41,7 @@ typedef struct {
 } perf_suppress_t;
 
 typedef enum {
+    RATE_LIMIT_LENCSE,
     RATE_LIMIT_SLICE,
     RATE_LIMIT_LEAKY_BUCKET
 } rate_limit_algo_t;

@@ -910,8 +910,8 @@ do_send(void* arg)
     stats_t*        stats;
     unsigned int    max_packet_size;
     perf_buffer_t   msg;
-    uint64_t        now, req_time, wait_us, q_sent = 0, q_step = 0, q_slice;
-    double          bucket_level = 0.0, capacity = 1.0, excess = 0.0, leaked = 0.0, q_step_double, req_time_double, now_double;
+    uint64_t        now, req_time, wait_us, q_sent = 0, q_step = 0, q_step_ns = 0, t1_ns = 0, now_ns, target_time;
+    double          bucket_level = 0.0, capacity = 1.0, excess = 0.0, leaked = 0.0;
     char            input_data[MAX_INPUT_DATA];
     perf_buffer_t   lines;
     perf_region_t   used;
@@ -939,13 +939,13 @@ do_send(void* arg)
 
     if (tinfo->max_qps > 0) {
         q_step = MILLION / tinfo->max_qps;
-        q_step_double = ((double) MILLION) / ((double) tinfo->max_qps);
+        q_step_ns = 1000000000ULL / tinfo->max_qps;
     }
     wait_for_start();
     now      = perf_get_time();
     req_time = now;
-    req_time_double = (double) now;
-    q_slice  = now + MILLION;
+    t1_ns = perf_get_time_ns();
+
     while (!interrupted && now < times->stop_time) {
         /* Avoid flooding the network too quickly. */
         if (stats->num_sent < tinfo->max_outstanding && stats->num_sent % 2 == 1) {
@@ -973,9 +973,23 @@ do_send(void* arg)
 
         /* Rate limiting */
         if (tinfo->max_qps > 0) {
-            if (config->rate_limit_algo == RATE_LIMIT_SLICE) {
-                now_double = (double) now;
-                if (req_time_double > now_double) {
+            if (config->rate_limit_algo == RATE_LIMIT_LENCSE) {
+                now_ns = perf_get_time_ns();
+                target_time = t1_ns + stats->num_sent * q_step_ns;
+                if (target_time > now_ns) {
+                    if (!any_inprogress) {
+                        //Spin sleep
+                        while (perf_get_time() < target_time) {
+                            /* busy wait */
+                        }
+                        now = perf_get_time();
+                    } else {
+                        now = perf_get_time();
+                        continue;
+                    }
+                }
+            } else if (config->rate_limit_algo == RATE_LIMIT_SLICE) {
+                if (req_time > now) {
                     if (!any_inprogress) { // only if nothing is in-progress
                         wait_us = req_time - now;
                         if (config->qps_threshold_wait && wait_us > config->qps_threshold_wait) {
@@ -995,7 +1009,6 @@ do_send(void* arg)
                     continue;
                 }
                 req_time += q_step;
-                req_time_double += q_step_double;
             } else { //config is leaky bucket
                 leaked = (double) (now - req_time) * (double) tinfo->max_qps / MILLION;
                 if (bucket_level > leaked) {
