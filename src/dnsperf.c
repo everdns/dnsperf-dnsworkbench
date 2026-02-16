@@ -979,7 +979,7 @@ do_send(void* arg)
                 if (target_time > now_ns) {
                     if (!any_inprogress) {
                         //Spin sleep
-                        while (perf_get_time() < target_time) {
+                        while (perf_get_time_ns() < target_time) {
                             /* busy wait */
                         }
                         now = perf_get_time();
