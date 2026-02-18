@@ -418,6 +418,8 @@ const char *rate_limit_algo_to_str(rate_limit_algo_t algo)
         return "slice";
     case RATE_LIMIT_LEAKY_BUCKET:
         return "leaky-bucket";
+    case RATE_LIMIT_LENCSE:
+        return "lencse";
     default:
         return "unknown";
     }
